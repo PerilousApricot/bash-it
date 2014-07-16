@@ -1,9 +1,9 @@
 SCM_THEME_PROMPT_PREFIX=""
 SCM_THEME_PROMPT_SUFFIX=""
 
-SCM_THEME_PROMPT_DIRTY=" ${bold_red}✗${normal}"
-SCM_THEME_PROMPT_CLEAN=" ${bold_green}✓${normal}"
-SCM_GIT_CHAR="${bold_green}±${normal}"
+SCM_THEME_PROMPT_DIRTY=" ${echo_bold_red}✗${echo_normal}"
+SCM_THEME_PROMPT_CLEAN=" ${echo_bold_green}✓${echo_normal}"
+SCM_GIT_CHAR="${echo_bold_green}±${echo_normal}"
 SCM_SVN_CHAR="${bold_cyan}⑆${normal}"
 SCM_HG_CHAR="${bold_red}☿${normal}"
 
@@ -42,7 +42,7 @@ modern_scm_prompt() {
         then
                 return
         else
-                echo "[$(scm_char)][$(scm_prompt_info)]"
+                echo -e "[$(scm_char)][$(scm_prompt_info)]"
         fi
 }
 
