@@ -31,14 +31,15 @@ function reload_plugins() {
 
 bash-it ()
 {
-    about 'bash-it help and maintenance'
-    param '1: verb [one of: help | show | enable | disable ]'
+    about 'Bash-it help and maintenance'
+    param '1: verb [one of: help | show | enable | disable | update ] '
     param '2: component type [one of: alias(es) | completion(s) | plugin(s) ]'
     param '3: specific component [optional]'
     example '$ bash-it show plugins'
     example '$ bash-it help aliases'
-    example '$ bash-it enable plugin git'
-    example '$ bash-it disable alias hg'
+    example '$ bash-it enable plugin git [tmux]...'
+    example '$ bash-it disable alias hg [tmux]...'
+    example '$ bash-it update'
     typeset verb=${1:-}
     shift
     typeset component=${1:-}
@@ -53,6 +54,8 @@ bash-it ()
              func=_disable-$component;;
          help)
              func=_help-$component;;
+         update)
+             func=_bash-it_update;;
          *)
              reference bash-it
              return;;
@@ -72,7 +75,15 @@ bash-it ()
             fi
         fi
     fi
-    $func $*
+
+    if [ x"$verb" == x"enable" -o x"$verb" == x"disable" ];then
+        for arg in "$@"
+        do
+            $func $arg
+        done
+    else
+        $func $*
+    fi
 }
 
 _is_function ()
@@ -80,7 +91,7 @@ _is_function ()
     _about 'sets $? to true if parameter is the name of a function'
     _param '1: name of alleged function'
     _group 'lib'
-    [ -n "$(type -a $1 2>/dev/null | grep 'is a function')" ]
+    [ -n "$(LANG=C type -t $1 2>/dev/null | grep 'function')" ]
 }
 
 _bash-it-aliases ()
@@ -107,6 +118,27 @@ _bash-it-plugins ()
     _bash-it-describe "plugins" "a" "plugin" "Plugin"
 }
 
+_bash-it_update() {
+  _about 'updates Bash-it'
+  _group 'lib'
+
+  cd "${BASH_IT}"
+  git fetch &> /dev/null
+  local status="$(git rev-list master..origin/master 2> /dev/null)"
+  if [[ -n "${status}" ]]; then
+    git pull --rebase &> /dev/null
+    if [[ $? -eq 0 ]]; then
+      echo "Bash-it successfully updated, enjoy!"
+      reload
+    else
+      echo "Error updating Bash-it, please, check if your Bash-it installation folder (${BASH_IT}) is clean."
+    fi
+  else
+    echo "Bash-it is up to date, nothing to do!"
+  fi
+  cd - &> /dev/null
+}
+
 _bash-it-describe ()
 {
     _about 'summarizes available bash_it components'
@@ -115,7 +147,7 @@ _bash-it-describe ()
     _param '3: file_type'
     _param '4: column_header'
     _example '$ _bash-it-describe "plugins" "a" "plugin" "Plugin"'
-    
+
     subdirectory="$1"
     preposition="$2"
     file_type="$3"
@@ -134,9 +166,9 @@ _bash-it-describe ()
         printf "%-20s%-10s%s\n" "$(basename $f | cut -d'.' -f1)" "  [$enabled]" "$(cat $f | metafor about-$file_type)"
     done
     printf '\n%s\n' "to enable $preposition $file_type, do:"
-    printf '%s\n' "$ bash-it enable $file_type  <$file_type name> -or- $ bash-it enable $file_type all"
+    printf '%s\n' "$ bash-it enable $file_type  <$file_type name> [$file_type name]... -or- $ bash-it enable $file_type all"
     printf '\n%s\n' "to disable $preposition $file_type, do:"
-    printf '%s\n' "$ bash-it disable $file_type <$file_type name> -or- $ bash-it disable $file_type all"
+    printf '%s\n' "$ bash-it disable $file_type <$file_type name> [$file_type name]... -or- $ bash-it disable $file_type all"
 }
 
 _disable-plugin ()
@@ -176,7 +208,7 @@ _disable-thing ()
     _param '2: file_type'
     _param '3: file_entity'
     _example '$ _disable-thing "plugins" "plugin" "ssh"'
-    
+
     subdirectory="$1"
     file_type="$2"
     file_entity="$3"
@@ -198,7 +230,7 @@ _disable-thing ()
     else
         typeset plugin=$(command ls $BASH_IT/$subdirectory/enabled/$file_entity.*bash 2>/dev/null | head -1)
         if [ -z "$plugin" ]; then
-            printf '%s\n' "sorry, that does not appear to be an enabled $file_type."
+            printf '%s\n' "sorry, $file_entity does not appear to be an enabled $file_type."
             return
         fi
         rm $BASH_IT/$subdirectory/enabled/$(basename $plugin)
@@ -244,8 +276,8 @@ _enable-thing ()
     _param '1: subdirectory'
     _param '2: file_type'
     _param '3: file_entity'
-    _example '$ _enable-thing "plugins" "plugin" "ssh"'	
-	
+    _example '$ _enable-thing "plugins" "plugin" "ssh"'
+
     subdirectory="$1"
     file_type="$2"
     file_entity="$3"
@@ -267,7 +299,7 @@ _enable-thing ()
     else
         typeset plugin=$(command ls $BASH_IT/$subdirectory/available/$file_entity.*bash 2>/dev/null | head -1)
         if [ -z "$plugin" ]; then
-            printf '%s\n' "sorry, that does not appear to be an available $file_type."
+            printf '%s\n' "sorry, $file_entity does not appear to be an available $file_type."
             return
         fi
 
@@ -283,6 +315,14 @@ _enable-thing ()
     fi
 
     printf '%s\n' "$file_entity enabled."
+}
+
+_help-completions()
+{
+  _about 'summarize all completions available in bash-it'
+  _group 'lib'
+
+  _bash-it-completions
 }
 
 _help-aliases()
@@ -339,6 +379,13 @@ _help-plugins()
     rm $grouplist 2> /dev/null
 }
 
+_help-update () {
+  _about 'help message for update command'
+  _group 'lib'
+
+  echo "Check for a new version of Bash-it and update it."
+}
+
 all_groups ()
 {
     about 'displays all unique metadata groups'
@@ -353,3 +400,21 @@ all_groups ()
     cat $file | sort | uniq
     rm $file
 }
+
+if ! type pathmunge > /dev/null 2>&1
+then
+  function pathmunge () {
+    about 'prevent duplicate directories in you PATH variable'
+    group 'lib helpers'
+    example 'pathmunge /path/to/dir is equivalent to PATH=/path/to/dir:$PATH'
+    example 'pathmunge /path/to/dir after is equivalent to PATH=$PATH:/path/to/dir'
+
+    if ! [[ $PATH =~ (^|:)$1($|:) ]] ; then
+      if [ "$2" = "after" ] ; then
+        export PATH=$PATH:$1
+      else
+        export PATH=$1:$PATH
+      fi
+    fi
+  }
+fi
